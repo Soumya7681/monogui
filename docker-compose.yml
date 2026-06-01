@@ -1,0 +1,40 @@
+# Instant demo: Mongui + a sample MongoDB.
+# Usage:
+#   docker compose up --build
+#   open http://localhost:3000  (login: admin / change-me)
+#
+# Change ADMIN_PASSWORD and SESSION_SECRET before any real use.
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongui:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      MONGODB_URI: mongodb://root:example@mongo:27017/?authSource=admin
+      ADMIN_USER: admin
+      ADMIN_PASSWORD: change-me
+      # Generate a real one: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+      SESSION_SECRET: replace-with-a-random-32-plus-character-secret
+      READ_ONLY: "false"
+
+volumes:
+  mongo-data:

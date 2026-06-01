@@ -1,36 +1,83 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Mongui
 
-## Getting Started
+A lightweight, self-hosted web UI for browsing and editing MongoDB — a maintained
+replacement for the deprecated [mongo-express](https://github.com/mongo-express/mongo-express).
 
-First, run the development server:
+Connect one MongoDB instance via a single `MONGODB_URI`, log in, and browse
+databases, run queries, and perform full document CRUD from your browser.
+
+- Single cached connection pool (the official `mongodb` driver)
+- Cookie session auth (`iron-session` + bcrypt), with an optional read-only mode
+- Extended JSON end to end, so `ObjectId`, `Date`, and `Decimal128` round-trip safely
+- Paginated, capped queries (filter / sort / projection) that never load a collection in full
+
+> [!WARNING]
+> Mongui grants full read/write access to the configured database. **Never expose
+> it on the public internet without authentication, and ideally keep it behind a
+> network boundary (VPN / private network).** Use `READ_ONLY=true` for a safe,
+> browse-only deployment.
+
+## Quick start (Docker Compose)
+
+Brings up Mongui plus a sample MongoDB:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+docker compose up --build
+# open http://localhost:3000  (login: admin / change-me)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Change `ADMIN_PASSWORD` and `SESSION_SECRET` in `docker-compose.yml` before any real use.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Quick start (local dev)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Requires Node.js 20.9+ and a reachable MongoDB.
 
-## Learn More
+```bash
+npm install
+cp .env.example .env.local   # then edit the values
+npm run dev                  # http://localhost:3000
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Run the production image
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+docker build -t mongui .
+docker run -p 3000:3000 \
+  -e MONGODB_URI="mongodb://user:pass@host:27017/?authSource=admin" \
+  -e ADMIN_USER=admin \
+  -e ADMIN_PASSWORD="a-strong-password" \
+  -e SESSION_SECRET="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")" \
+  mongui
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Configuration
 
-## Deploy on Vercel
+All configuration comes from environment variables (see `.env.example`):
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `MONGODB_URI` | yes | Connection string for the single MongoDB instance. Include credentials + `authSource` if the server has auth enabled. |
+| `ADMIN_USER` | yes | Login username. |
+| `ADMIN_PASSWORD` | yes | Login password in **plaintext** — Mongui bcrypt-hashes it at runtime, so you never generate or escape a hash yourself. |
+| `SESSION_SECRET` | yes | 32+ character secret used to encrypt the session cookie. Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. |
+| `READ_ONLY` | no | When `true`, all write operations (insert/update/delete/drop) return 403. Defaults to `false`. |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Secrets are kept in `.env.local` (gitignored); `.env.example` documents every variable.
+
+## Scripts
+
+```bash
+npm run dev      # dev server (Turbopack) on :3000
+npm run build    # production build
+npm run start    # serve the production build
+npm run lint     # eslint
+```
+
+## Tech stack
+
+Next.js 16 (App Router) · React 19 · TypeScript · the official `mongodb` driver ·
+Tailwind CSS 4 · TanStack Query & Table · CodeMirror 6 · iron-session · zod.
+
+## License
+
+[MIT](./LICENSE)
